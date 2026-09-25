@@ -3,58 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP.NEMOBASE - Admin Panel</title>
+    <title>ადმინ პანელი - IP.NEMOBASE</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         body { background: #0f172a; color: #f8fafc; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        h1 { font-size: 24px; color: #38bdf8; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .login-box { background: #1e293b; padding: 30px; border-radius: 12px; max-width: 400px; margin: 50px auto; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 12px 0; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+        button { background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0369a1; }
+        .btn-danger { background: #dc2626; }
+        .btn-danger:hover { background: #b91c1c; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1e293b; border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #334155; }
-        th { background: #334155; color: #38bdf8; font-size: 14px; text-transform: uppercase; }
-        tr:hover { background: #24334d; }
-        .back-btn { display: inline-block; margin-bottom: 20px; color: #94a3b8; text-decoration: none; font-size: 14px; }
-        .back-btn:hover { color: #38bdf8; }
+        th { background: #0f172a; color: #38bdf8; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .name-input { width: 110px; padding: 6px; margin: 0; font-size: 13px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-btn">← მთავარზე დაბრუნება</a>
-        <h1>⚙️ ადმინ პანელი - ლოგები</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th>დრო</th>
-                    <th>IP მისამართი</th>
-                    <th>ქვეყანა / რეგიონი</th>
-                </tr>
-            </thead>
-            <tbody id="logs-body">
-                <tr><td colspan="3">იტვირთება...</td></tr>
-            </tbody>
-        </table>
+        <div id="loginSection" class="login-box">
+            <h2>ადმინში შესვლა</h2>
+            <input type="password" id="password" placeholder="შეიყვანეთ პაროლი">
+            <button onclick="login()">შესვლა</button>
+            <p id="errorMsg" style="color: #ef4444; margin-top: 10px;"></p>
+        </div>
+
+        <div id="adminSection" style="display: none;">
+            <div class="header-flex">
+                <h1>⚙️ IP-ების პანელი</h1>
+                <button class="btn-danger" onclick="logout()">გამოსვლა</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>IP</th>
+                        <th>რეგიონი</th>
+                        <th>სახელი</th>
+                        <th>თარიღი</th>
+                        <th>წაშლა</th>
+                    </tr>
+                </thead>
+                <tbody id="logsTable"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        fetch('/api/logs')
-            .then(res => res.json())
-            .then(data => {
-                const tbody = document.getElementById('logs-body');
-                tbody.innerHTML = '';
-                if(data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3">ჩანაწერები არ არის</td></tr>';
-                    return;
-                }
-                data.reverse().forEach(log => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${new Date(log.timestamp).toLocaleString('ka-GE')}</td>
-                        <td><strong>${log.ip}</strong></td>
-                        <td>${log.region}</td>
-                    `;
-                    tbody.appendChild(row);
+        function checkAuth() {
+            fetch('/api/admin/check')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        document.getElementById('loginSection').style.display = 'none';
+                        document.getElementById('adminSection').style.display = 'block';
+                        loadLogs();
+                    }
                 });
+        }
+
+        function login() {
+            const password = document.getElementById('password').value;
+            fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) checkAuth();
+                else document.getElementById('errorMsg').innerText = data.message;
             });
+        }
+
+        function logout() {
+            fetch('/api/admin/logout', { method: 'POST' }).then(() => location.reload());
+        }
+
+        function loadLogs() {
+            fetch('/api/admin/logs')
+                .then(r => r.json())
+                .then(logs => {
+                    const tbody = document.getElementById('logsTable');
+                    tbody.innerHTML = '';
+                    if (!logs || logs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">ლოგები ჯერ არ არის</td></tr>';
+                        return;
+                    }
+                    logs.forEach(log => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${log.id}</td>
+                            <td><b>${log.ip}</b></td>
+                            <td>${log.region}</td>
+                            <td>
+                                <input class="name-input" type="text" value="${log.custom_name || ''}" placeholder="სახელი" id="name-${log.id}">
+                                <button onclick="updateName(${log.id})">💾</button>
+                            </td>
+                            <td>${new Date(log.created_at).toLocaleTimeString('ka-GE')}</td>
+                            <td><button class="btn-danger" onclick="deleteLog(${log.id})">❌</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        function updateName(id) {
+            const name = document.getElementById(`name-${id}`).value;
+            fetch('/api/admin/update-name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, custom_name: name })
+            }).then(() => alert('სახელი შენახულია!'));
+        }
+
+        function deleteLog(id) {
+            if (confirm('ნამდვილად გსურთ წაშლა?')) {
+                fetch(`/api/admin/delete/${id}`, { method: 'DELETE' }).then(() => loadLogs());
+            }
+        }
+
+        checkAuth();
     </script>
 </body>
 </html>
